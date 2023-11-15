@@ -1,0 +1,7 @@
+syntax: glob
+
+__pycache__/
+.idea
+.venv
+.downloads
+.parsed
