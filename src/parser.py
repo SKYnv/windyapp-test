@@ -10,6 +10,7 @@ from aiofiles import open
 from aiofiles.os import listdir, scandir
 
 from src.const import NO_DATA
+from src.exceptions import ParseError
 from src.utils import parse_file_name, process_nan, batched
 
 logger = logging.getLogger(__name__)
@@ -69,23 +70,29 @@ class MeteoParser:
         lat_step, lon_step = 0, 0
         buffer = io.BytesIO()
 
-        for row in data.loc[:, ["tp"]].iterrows():
-            if not start_lat:
-                start_lat = row[0][1]
+        try:
+            iterator = iter(data.loc[:, ["tp"]].iterrows())
 
-            if not start_lon:
-                start_lon = row[0][2]
+            while not all([start_lat, start_lon, lat_step, lon_step]):
+                row = next(iterator)
+                if not start_lat:
+                    start_lat = row[0][1]
 
-            if lat_step == 0:
-                lat_step = start_lat - row[0][1]
+                if not start_lon:
+                    start_lon = row[0][2]
 
-            if lon_step == 0:
-                lon_step = start_lon - row[0][2]
-            # после выделения шагов можно оборвать итерацию и взять последниюю строку для оставшихся даннх
-        end_lat = row[0][1]
-        end_lon = row[0][2]
+                if lat_step == 0:
+                    lat_step = start_lat - row[0][1]
 
-        # TODO 48 час отличается формат, больше на 1 столбец
+                if lon_step == 0:
+                    lon_step = start_lon - row[0][2]
+
+            for row in data.tail(10).loc[:, ["tp"]].iterrows():
+                end_lat = row[0][1]
+                end_lon = row[0][2]
+        except Exception as exc:
+            raise ParseError(f"Parsing error of {path.name}")
+            # TODO 48 час отличается формат, больше на 1 столбец
 
         header = self.get_header(start_lat, end_lat, start_lon, end_lon, lat_step, lon_step)
 
