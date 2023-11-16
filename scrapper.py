@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from yarl import URL
 
 from exceptions import DownloadError
-from utils import parse_file_name
+from utils import parse_file_name, batched
 from const import *
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class MeteoScrapper:
         logger.info(f"Scrapper started for {data_url=}.")
 
     async def get_page_data(self) -> str:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(headers=HTTP_HEADERS) as session:
             async with session.get(self.data_url) as response:
                 if not response.ok:
                     raise DownloadError(response.reason)
@@ -38,8 +38,11 @@ class MeteoScrapper:
         logger.info(f"Found {len(links) - 1} files.")
         self.files_list = [tag.get("href") for tag in links][1:]
 
-        # TODO нужны только regular_lat_lon отфильтровать можно здесь
+        await self.filter_files()
         return self.files_list
+
+    async def filter_files(self):
+        self.files_list = [name for name in self.files_list if parse_file_name(name).has_coords]
 
     # todo scheduling
     async def download_links(self):
@@ -53,13 +56,16 @@ class MeteoScrapper:
 
         for file_name in files_names:
             tasks.append(asyncio.create_task(self.download(Path(save_path) / file_name)))
-        await asyncio.gather(*tasks)
+
+        for batch in batched(tasks, MAX_DOWNLOAD_THREADS):
+            await asyncio.gather(*batch)
+
         time_diff = time.time() - start_time
         logger.info(f"Grab time: {time_diff:.2f}s")
         await self.write_report(save_path)
 
     async def download(self, path):
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(headers=HTTP_HEADERS) as session:
             base_url = URL(self.data_url)
             async with session.get(base_url / path.name) as response:
                 await self.save_file(path, await response.read())

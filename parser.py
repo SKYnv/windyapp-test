@@ -55,7 +55,11 @@ class MeteoParser:
     async def parse_file(self, path):
         data = await self.read_file(path)
         # todo есть датафрейм, фильтровать и сохранить
-        print(data)
+        print(data.keys())
+        print(data["time"].iloc[0])
+
+        f_ = data["time"].dt.minute == 0
+        print(data.loc[f_])
 
         # await self.save_file(path, stream)
 
@@ -79,6 +83,6 @@ class MeteoParser:
             logger.exception("Unknown error")
 
     async def run(self):
-        logger.info(f"MereoParse run")
+        logger.info(f"MeteoParse run")
         await self.scan_directories()
         await self.scan_directory()

@@ -2,6 +2,7 @@ from models import FileName
 from functools import wraps
 import time
 import logging
+from itertools import islice
 
 logger = logging.getLogger(__name__)
 
@@ -21,3 +22,10 @@ def timeit(func):
 def parse_file_name(name: str) -> FileName:
     return FileName(*name.split("_", 6))
 
+
+def batched(iterable, batch_size):
+    if batch_size < 1:
+        raise ValueError("Too small batch_size")
+    it = iter(iterable)
+    while batch := tuple(islice(it, batch_size)):
+        yield batch
