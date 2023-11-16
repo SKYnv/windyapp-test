@@ -11,3 +11,4 @@ HTTP_HEADERS: dict = {
                   "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 }
 MAX_DOWNLOAD_THREADS: int = 10
+DEFAULT_MULTIPLIER: int = 1000000

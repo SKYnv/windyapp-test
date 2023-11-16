@@ -1,17 +1,17 @@
 import asyncio
-from struct import pack
 import io
 import logging
 from pathlib import Path
+from struct import pack
 
 import pandas as pd
 import xarray as xr
 from aiofiles import open
 from aiofiles.os import listdir, scandir
 
-from src.const import NO_DATA
+from src.const import NO_DATA, DEFAULT_MULTIPLIER
 from src.exceptions import ParseError
-from src.utils import parse_file_name, process_nan, batched
+from src.utils import parse_file_name, process_nan, convert_float
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +73,11 @@ class MeteoParser:
         lat_step, lon_step = 0, 0
         buffer = io.BytesIO()
 
+        # костыль
         def shift_index_by_offset(index, offset):
             # Обработка последнего файла у которого почему-то отличается кол-во столбцов и индекс
+            # WARNING:cfgrib.messages:Ignoring index file 'icon-d2_germany_regular-lat-lon_single-level_
+            # 2023111612_048_2d_tot_prec.grib2.923a8.idx' older than GRIB file
             if offset == 48:
                 index -= 1
             return index
@@ -115,10 +118,10 @@ class MeteoParser:
             buffer.write(pack("<f", process_nan(item)))
         buffer.seek(0)
 
-        save_path = await self.get_save_path(path)
+        save_path = self.get_save_path(path)
         await self.save_file(save_path, buffer.read())
 
-    async def get_save_path(self, path):
+    def get_save_path(self, path):
         parsed_name = parse_file_name(path.name)
         directory = Path(self.output_dir) / parsed_name.model_name / parsed_name.output_date
         directory.mkdir(parents=True, exist_ok=True)
@@ -137,15 +140,16 @@ class MeteoParser:
         :param lon1: left longtitude
         :param lon2: right longtitude
         """
-        def find_mul(value):
-            s = str(value)
-            if "." in s:
-                zeros_count = abs(s.find(".") - len(s)) - 1
-                return int("1".ljust(zeros_count - 1, "0"))
-            else:
-                return 1
-
-        return [lat1, lat2, lon1, lon2, step_lat, step_lon, find_mul(lon1), NO_DATA]
+        return [
+            convert_float(lat1, DEFAULT_MULTIPLIER),
+            convert_float(lat2, DEFAULT_MULTIPLIER),
+            convert_float(lon1, DEFAULT_MULTIPLIER),
+            convert_float(lon2, DEFAULT_MULTIPLIER),
+            convert_float(step_lat, DEFAULT_MULTIPLIER),
+            convert_float(step_lon, DEFAULT_MULTIPLIER),
+            DEFAULT_MULTIPLIER,
+            NO_DATA
+        ]
 
     async def read_file(self, path) -> pd.DataFrame:
         logger.info(f"Reading {path}")

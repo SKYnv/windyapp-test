@@ -38,3 +38,7 @@ def process_nan(value):
     if np.isnan(value):
         return NO_DATA
     return value
+
+
+def convert_float(value, multiplier):
+    return int(float(format(value, '.6f')) * multiplier)

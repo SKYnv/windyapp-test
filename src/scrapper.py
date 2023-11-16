@@ -45,7 +45,6 @@ class MeteoScrapper:
     async def filter_files(self):
         self.files_list = [name for name in self.files_list if parse_file_name(name).has_coords]
 
-    # todo scheduling
     async def download_links(self):
         start_time = time.time()
 
