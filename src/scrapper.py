@@ -35,10 +35,11 @@ class MeteoScrapper:
     async def extract_files_list(self) -> list[str]:
         soup = BeautifulSoup(await self.get_page_data(), "html.parser")
         links = soup.find_all("a", href=True)
-        logger.info(f"Found {len(links) - 1} files.")
         self.files_list = [tag.get("href") for tag in links][1:]
 
         await self.filter_files()
+
+        logger.info(f"Found {len(self.files_list) - 1} files.")
         return self.files_list
 
     async def filter_files(self):
@@ -93,3 +94,4 @@ class MeteoScrapper:
 
     async def run(self):
         await self.download_links()
+        return True

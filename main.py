@@ -14,11 +14,10 @@ async def main():
     parse_task = asyncio.create_task(MeteoParser(DOWNLOAD_DIR, PARSED_DIR).run())
 
     try:
-        if scrap_task.done():
+        if scrap_task:
             await parse_task
     except Exception:
         logger.exception("Error")
-        await parse_task  # sic!
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

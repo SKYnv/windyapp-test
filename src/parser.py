@@ -58,11 +58,14 @@ class MeteoParser:
             models_name.add(file.model_name)
         return models_name
 
+    # TODO refactoring
+    # TODO xrange?
     async def parse_file(self, path):
         data = await self.read_file(path)
 
         # фильтруем данные на начало часа
-        time = parse_file_name(path.name).dataframe_time
+        parsed_name = parse_file_name(path.name)
+        time = parsed_name.dataframe_time
         at_start_hour = data["valid_time"] <= time
         data = data[at_start_hour]
 
@@ -70,29 +73,34 @@ class MeteoParser:
         lat_step, lon_step = 0, 0
         buffer = io.BytesIO()
 
+        def shift_index_by_offset(index, offset):
+            # Обработка последнего файла у которого почему-то отличается кол-во столбцов и индекс
+            if offset == 48:
+                index -= 1
+            return index
+
         try:
             iterator = iter(data.loc[:, ["tp"]].iterrows())
 
             while not all([start_lat, start_lon, lat_step, lon_step]):
                 row = next(iterator)
                 if not start_lat:
-                    start_lat = row[0][1]
+                    start_lat = row[0][shift_index_by_offset(1, parsed_name.offset)]
 
                 if not start_lon:
-                    start_lon = row[0][2]
+                    start_lon = row[0][shift_index_by_offset(2, parsed_name.offset)]
 
                 if lat_step == 0:
-                    lat_step = start_lat - row[0][1]
+                    lat_step = start_lat - row[0][shift_index_by_offset(1, parsed_name.offset)]
 
                 if lon_step == 0:
-                    lon_step = start_lon - row[0][2]
+                    lon_step = start_lon - row[0][shift_index_by_offset(2, parsed_name.offset)]
 
             for row in data.tail(10).loc[:, ["tp"]].iterrows():
-                end_lat = row[0][1]
-                end_lon = row[0][2]
+                end_lat = row[0][shift_index_by_offset(1, parsed_name.offset)]
+                end_lon = row[0][shift_index_by_offset(2, parsed_name.offset)]
         except Exception as exc:
             raise ParseError(f"Parsing error of {path.name}")
-            # TODO 48 час отличается формат, больше на 1 столбец
 
         header = self.get_header(start_lat, end_lat, start_lon, end_lon, lat_step, lon_step)
 
