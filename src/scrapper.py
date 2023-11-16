@@ -10,9 +10,9 @@ import aiohttp
 from bs4 import BeautifulSoup
 from yarl import URL
 
-from const import *
-from exceptions import DownloadError
-from utils import parse_file_name, batched
+from src.const import HTTP_HEADERS, MAX_DOWNLOAD_THREADS
+from src.exceptions import DownloadError
+from src.utils import parse_file_name, batched
 
 logger = logging.getLogger(__name__)
 

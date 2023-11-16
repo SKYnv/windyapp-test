@@ -2,8 +2,10 @@ import logging
 import time
 from functools import wraps
 from itertools import islice
+import numpy as np
 
-from models import FileName
+from src.models import FileName
+from src.const import NO_DATA
 
 logger = logging.getLogger(__name__)
 
@@ -30,3 +32,9 @@ def batched(iterable, batch_size):
     it = iter(iterable)
     while batch := tuple(islice(it, batch_size)):
         yield batch
+
+
+def process_nan(value):
+    if np.isnan(value):
+        return NO_DATA
+    return value

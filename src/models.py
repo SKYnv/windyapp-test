@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from pydantic.dataclasses import dataclass
 
-from const import DATE_HOUR_FORMAT, DATE_HOUR_OUTPUT_FORMAT
+from src.const import DATE_HOUR_FORMAT, DATE_HOUR_OUTPUT_FORMAT, DATAFRAME_DATE_TIME_FORMAT
 
 
 @dataclass
@@ -22,6 +22,10 @@ class FileName:
     @property
     def output_date(self):
         return self.get_date_hour.strftime(DATE_HOUR_OUTPUT_FORMAT)
+
+    @property
+    def dataframe_time(self):
+        return self.get_date_hour.strftime(DATAFRAME_DATE_TIME_FORMAT)
 
     @property
     def get_full_name(self):
