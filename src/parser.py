@@ -85,6 +85,8 @@ class MeteoParser:
         end_lat = row[0][1]
         end_lon = row[0][2]
 
+        # TODO 48 час отличается формат, больше на 1 столбец
+
         header = self.get_header(start_lat, end_lat, start_lon, end_lon, lat_step, lon_step)
 
         current_hour_data = data["tp"]
