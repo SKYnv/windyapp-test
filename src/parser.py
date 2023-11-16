@@ -1,8 +1,8 @@
 import asyncio
+import bz2
 import io
 import logging
 from pathlib import Path
-import bz2
 
 import pandas as pd
 import xarray as xr

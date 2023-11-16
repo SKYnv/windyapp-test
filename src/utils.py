@@ -1,8 +1,9 @@
-from models import FileName
-from functools import wraps
-import time
 import logging
+import time
+from functools import wraps
 from itertools import islice
+
+from models import FileName
 
 logger = logging.getLogger(__name__)
 

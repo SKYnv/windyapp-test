@@ -1,18 +1,18 @@
 import asyncio
+import bz2
 import datetime
 import logging
 import time
 from pathlib import Path
-import bz2
 
 import aiofiles
 import aiohttp
 from bs4 import BeautifulSoup
 from yarl import URL
 
+from const import *
 from exceptions import DownloadError
 from utils import parse_file_name, batched
-from const import *
 
 logger = logging.getLogger(__name__)
 
