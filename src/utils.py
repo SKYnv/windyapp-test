@@ -2,10 +2,11 @@ import logging
 import time
 from functools import wraps
 from itertools import islice
+
 import numpy as np
 
-from src.models import FileName
 from src.const import NO_DATA
+from src.models import FileName
 
 logger = logging.getLogger(__name__)
 

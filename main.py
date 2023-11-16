@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from src.const import *
+from src.const import METEO_DATA_URL, DOWNLOAD_DIR, PARSED_DIR
 from src.parser import MeteoParser
 from src.scrapper import MeteoScrapper
 
