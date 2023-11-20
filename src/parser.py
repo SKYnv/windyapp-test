@@ -1,12 +1,12 @@
 import asyncio
-import io
 import logging
+import time
 from pathlib import Path
 from struct import pack
+from typing import List
 
 import pandas as pd
 import xarray as xr
-from aiofiles import open
 from aiofiles.os import listdir, scandir
 
 from src.const import NO_DATA, DEFAULT_MULTIPLIER
@@ -23,12 +23,12 @@ class MeteoParser:
         self.directories: set | None = None
         self.last_hour_data = pd.DataFrame()
 
-    async def scan_directories(self):
+    async def scan_directories(self) -> List:
         list_dirs = await listdir(Path(self.input_folder))
         self.directories = set(list_dirs)
         return list_dirs
 
-    async def scan_directory(self):
+    async def scan_directory(self) -> None:
         for directory in self.directories:
             root_path = Path(self.input_folder) / directory
             path = root_path / "log.txt"
@@ -36,7 +36,7 @@ class MeteoParser:
                 logger.info(f"Start to parse files in {root_path}.")
                 await self.parse_directory(root_path)
 
-    async def parse_directory(self, path):
+    async def parse_directory(self, path: Path) -> None:
         logger.info(f"Parse directory {path}")
         files_list = sorted([x.name for x in await scandir(Path(path)) if x.name.endswith("grib2")])
 
@@ -49,7 +49,7 @@ class MeteoParser:
             tasks.append(asyncio.create_task(self.parse_file(Path(path) / file_name)))
         await asyncio.gather(*tasks)
 
-    def get_models_name(self, files_list):
+    def get_models_name(self, files_list: List):
         models_name = set()
         for file_name in files_list:
             if file_name == "log.txt":
@@ -60,7 +60,7 @@ class MeteoParser:
 
     # TODO refactoring
     # TODO xrange?
-    async def parse_file(self, path):
+    async def parse_file(self, path: Path) -> None:
         data = await self.read_file(path)
 
         # фильтруем данные на начало часа
@@ -71,10 +71,9 @@ class MeteoParser:
 
         start_lat, start_lon, end_lat, end_lon = None, None, None, None
         lat_step, lon_step = 0, 0
-        buffer = io.BytesIO()
 
         # костыль
-        def shift_index_by_offset(index, offset):
+        def shift_index_by_offset(index: int, offset: int) -> int:
             # Обработка последнего файла у которого почему-то отличается кол-во столбцов и индекс
             # WARNING:cfgrib.messages:Ignoring index file 'icon-d2_germany_regular-lat-lon_single-level_
             # 2023111612_048_2d_tot_prec.grib2.923a8.idx' older than GRIB file
@@ -105,53 +104,51 @@ class MeteoParser:
         except Exception as exc:
             raise ParseError(f"Parsing error of {path.name}")
 
-        header = self.get_header(start_lat, end_lat, start_lon, end_lon, lat_step, lon_step)
-
         current_hour_data = data["tp"]
         if len(self.last_hour_data):
             current_hour_data = data["tp"] - self.last_hour_data
         self.last_hour_data = data["tp"]
 
-        for item in header:
-            buffer.write(pack("<f", item))
-        for item in current_hour_data.tolist():
-            buffer.write(pack("<f", process_nan(item)))
-        buffer.seek(0)
-
         save_path = self.get_save_path(path)
-        await self.save_file(save_path, buffer.read())
+        header = self.get_header(start_lat, end_lat, start_lon, end_lon, lat_step, lon_step)
 
-    def get_save_path(self, path):
+        await self.save_file(save_path, header, current_hour_data.tolist())
+
+    def get_save_path(self, path: Path) -> Path:
         parsed_name = parse_file_name(path.name)
         directory = Path(self.output_dir) / parsed_name.model_name / parsed_name.output_date
         directory.mkdir(parents=True, exist_ok=True)
         return directory / "PRATE.wgf4"
 
-    async def save_file(self, path, stream):
-        async with open(path, mode="wb") as file:
-            await file.write(stream)
-            await file.flush()
-            logger.info(f"File {path} saved.")
+    async def save_file(self, path, header: List, data: List) -> None:
+        def _save(path, header, data):
+            with open(path, mode="wb") as file:
+                for item in header:
+                    file.write(pack("<f", item))
+                for item in data:
+                    file.write(pack("<f", process_nan(item)))
+                logger.info(f"File {path} saved.")
+        await asyncio.to_thread(_save, path, header, data)
 
-    def get_header(self, lat1, lat2, lon1, lon2, step_lat, step_lon):
+    def get_header(self, latitude1, latitude2, longtitude1, longtitude2, step_latitude, step_longtitude) -> List:
         """
-        :param lat1: bottom latitude
-        :param lat2: top latitue
-        :param lon1: left longtitude
-        :param lon2: right longtitude
+        :param latitude1: bottom latitude
+        :param latitude2: top latitue
+        :param longtitude1: left longtitude
+        :param longtitude2: right longtitude
         """
         return [
-            convert_float(lat1, DEFAULT_MULTIPLIER),
-            convert_float(lat2, DEFAULT_MULTIPLIER),
-            convert_float(lon1, DEFAULT_MULTIPLIER),
-            convert_float(lon2, DEFAULT_MULTIPLIER),
-            convert_float(step_lat, DEFAULT_MULTIPLIER),
-            convert_float(step_lon, DEFAULT_MULTIPLIER),
+            convert_float(latitude1, DEFAULT_MULTIPLIER),
+            convert_float(latitude2, DEFAULT_MULTIPLIER),
+            convert_float(longtitude1, DEFAULT_MULTIPLIER),
+            convert_float(longtitude2, DEFAULT_MULTIPLIER),
+            convert_float(step_latitude, DEFAULT_MULTIPLIER),
+            convert_float(step_longtitude, DEFAULT_MULTIPLIER),
             DEFAULT_MULTIPLIER,
             NO_DATA
         ]
 
-    async def read_file(self, path) -> pd.DataFrame:
+    async def read_file(self, path: Path) -> pd.DataFrame:
         logger.info(f"Reading {path}")
         try:
             # backend_kwargs={"extra_coords": {"startStep": "step"}}
@@ -159,9 +156,14 @@ class MeteoParser:
             return ds.to_dataframe()
 
         except Exception as exc:
-            logger.exception("Unknown error")
+            logger.exception("Unexpected error")
 
     async def run(self):
-        logger.info(f"MeteoParse run")
+        start_time = time.time()
+
+        logger.info(f"MeteoParser run")
         await self.scan_directories()
         await self.scan_directory()
+
+        time_diff = time.time() - start_time
+        logger.info(f"MeteoParser finished, parse time: {time_diff:.2f}s")

@@ -4,6 +4,7 @@ import datetime
 import logging
 import time
 from pathlib import Path
+from typing import List
 
 import aiofiles
 import aiohttp
@@ -31,8 +32,8 @@ class MeteoScrapper:
                     raise DownloadError(response.reason)
                 return await response.text()
 
-    # slow # todo future?
-    async def extract_files_list(self) -> list[str]:
+    # todo slow
+    async def extract_files_list(self) -> List[str]:
         soup = BeautifulSoup(await self.get_page_data(), "html.parser")
         links = soup.find_all("a", href=True)
         self.files_list = [tag.get("href") for tag in links][1:]
@@ -42,10 +43,10 @@ class MeteoScrapper:
         logger.info(f"Found {len(self.files_list) - 1} files.")
         return self.files_list
 
-    async def filter_files(self):
+    async def filter_files(self) -> None:
         self.files_list = [name for name in self.files_list if parse_file_name(name).has_coords]
 
-    async def download_links(self):
+    async def download_links(self) -> None:
         start_time = time.time()
 
         tasks = []
@@ -64,27 +65,27 @@ class MeteoScrapper:
         logger.info(f"Grab time: {time_diff:.2f}s")
         await self.write_report(save_path)
 
-    async def download(self, path):
+    async def download(self, path: Path) -> None:
         async with aiohttp.ClientSession(headers=HTTP_HEADERS) as session:
             base_url = URL(self.data_url)
             async with session.get(base_url / path.name) as response:
                 await self.save_file(path, await response.read())
 
-    async def save_file(self, path, stream):
+    async def save_file(self, path: Path, stream) -> None:
         async with aiofiles.open(path, mode="wb") as file:
             await file.write(stream)
             await file.flush()
             logger.info(f"File {path.name} saved.")
         await self.decompress_file(path)
 
-    async def write_report(self, path):
+    async def write_report(self, path: Path) -> None:
         async with aiofiles.open(path / "log.txt", mode="w") as file:
             await file.write(f"Files count: {len(self.files_list)}\n")
             await file.write(f"Finished at: {datetime.datetime.today()}\n")
             await file.flush()
             logger.info(f"report {path.name} saved.")
 
-    async def decompress_file(self, path):
+    async def decompress_file(self, path: Path) -> None:
         def decompress(path):
             with open(str(path)[:-4], mode="wb") as decompressed, bz2.BZ2File(path, "rb") as file:
                 decompressed.write(file.read())
