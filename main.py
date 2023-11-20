@@ -10,9 +10,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main():
-    scrap_task = await asyncio.create_task(MeteoScrapper(METEO_DATA_URL, DOWNLOAD_DIR).run())
+    # scrap_task = await asyncio.create_task(MeteoScrapper(METEO_DATA_URL, DOWNLOAD_DIR).run())
     parse_task = asyncio.create_task(MeteoParser(DOWNLOAD_DIR, PARSED_DIR).run())
-
+    scrap_task = 1
     try:
         if scrap_task:
             await parse_task

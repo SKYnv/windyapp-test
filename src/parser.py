@@ -1,12 +1,10 @@
 import asyncio
-import io
 import logging
 from pathlib import Path
 from struct import pack
 
 import pandas as pd
 import xarray as xr
-from aiofiles import open
 from aiofiles.os import listdir, scandir
 
 from src.const import NO_DATA, DEFAULT_MULTIPLIER
@@ -71,7 +69,6 @@ class MeteoParser:
 
         start_lat, start_lon, end_lat, end_lon = None, None, None, None
         lat_step, lon_step = 0, 0
-        buffer = io.BytesIO()
 
         # костыль
         def shift_index_by_offset(index, offset):
@@ -105,21 +102,15 @@ class MeteoParser:
         except Exception as exc:
             raise ParseError(f"Parsing error of {path.name}")
 
-        header = self.get_header(start_lat, end_lat, start_lon, end_lon, lat_step, lon_step)
-
         current_hour_data = data["tp"]
         if len(self.last_hour_data):
             current_hour_data = data["tp"] - self.last_hour_data
         self.last_hour_data = data["tp"]
 
-        for item in header:
-            buffer.write(pack("<f", item))
-        for item in current_hour_data.tolist():
-            buffer.write(pack("<f", process_nan(item)))
-        buffer.seek(0)
-
         save_path = self.get_save_path(path)
-        await self.save_file(save_path, buffer.read())
+        header = self.get_header(start_lat, end_lat, start_lon, end_lon, lat_step, lon_step)
+
+        await self.save_file(save_path, header, current_hour_data.tolist())
 
     def get_save_path(self, path):
         parsed_name = parse_file_name(path.name)
@@ -127,11 +118,15 @@ class MeteoParser:
         directory.mkdir(parents=True, exist_ok=True)
         return directory / "PRATE.wgf4"
 
-    async def save_file(self, path, stream):
-        async with open(path, mode="wb") as file:
-            await file.write(stream)
-            await file.flush()
-            logger.info(f"File {path} saved.")
+    async def save_file(self, path, header: list, data: list):
+        def _save(path, header, data):
+            with open(path, mode="wb") as file:
+                for item in header:
+                    file.write(pack("<f", item))
+                for item in data:
+                    file.write(pack("<f", process_nan(item)))
+                logger.info(f"File {path} saved.")
+        await asyncio.to_thread(_save, path, header, data)
 
     def get_header(self, lat1, lat2, lon1, lon2, step_lat, step_lon):
         """
